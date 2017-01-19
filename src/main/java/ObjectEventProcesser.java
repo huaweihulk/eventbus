@@ -1,6 +1,8 @@
 import com.lmax.disruptor.EventHandler;
 
 import java.util.LinkedList;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -13,12 +15,19 @@ public class ObjectEventProcesser implements EventHandler<ObjectEvent> {
 
     private ReadWriteLock readWriteLock = new ReentrantReadWriteLock();
 
+    private Executor executor = Executors.newCachedThreadPool();
+
     @Override
-    public void onEvent(ObjectEvent objectEvent, long l, boolean b) throws Exception {
+    public void onEvent(final ObjectEvent objectEvent, final long l, final boolean b) throws Exception {
         readWriteLock.readLock().lock();
-        for (ObjectEventHandler objectEventHandler : handlers) {
+        for (final ObjectEventHandler objectEventHandler : handlers) {
             if (objectEvent.getObjectTag() == objectEventHandler.getTag()) {
-                objectEventHandler.handleEvent(objectEvent.getObject(), l, b);
+                executor.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        objectEventHandler.handleEvent(objectEvent.getObject(), l, b);
+                    }
+                });
             }
         }
         readWriteLock.readLock().unlock();
